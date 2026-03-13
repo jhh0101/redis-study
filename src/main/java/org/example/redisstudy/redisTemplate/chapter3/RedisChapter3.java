@@ -17,6 +17,9 @@ public class RedisChapter3 {
 //      isMember(key, value): (중요!) 주머니에 이 데이터가 들어있는지 확인합니다. (T/F 반환)
 //      remove(key, value): 특정 데이터를 주머니에서 뺍니다.
 //      size(key): 주머니에 데이터가 총 몇 개 있는지 확인합니다.
+//      intersect(key1, key2) 교집합: 둘 다 가지고 있는 것	공통 친구, 공통 관심사
+//      union(key1, key2) 합집합: 둘 중 하나라도 가진 것	전체 카테고리, 중복 제거 목록
+//      difference(key1, key2) 차집합: key1에는 있지만 key2에는 없는 것	내가 모르는 상대방의 관심사 (추천)
 
     // 게시글에 태그 추가
     public void addTag(String postId, String tag) {
@@ -41,5 +44,27 @@ public class RedisChapter3 {
         return isTag;
     }
 
+    // 유저의 관심사 태그들을 저장
+    public void addUserInterests(String userId, String... tags) {
+        String key = "user:interests:" + userId;
+        redisTemplate.opsForSet().add(key, tags);
+    }
 
+    // 두 유저가 동시에 좋아하는 태그 목록
+    public Set<String> getCommonInterests(String userA, String userB) {
+        String keyA = "user:interests:" + userA;
+        String keyB = "user:interests:" + userB;
+        Set<String> tags = redisTemplate.opsForSet().intersect(keyA, keyB);
+        System.out.println(tags);
+        return tags;
+    }
+
+    // 상대방은 좋아하지만 나는 아직 등록하지 않은 태그 목록
+    public Set<String> getRecommendedInterests(String me, String other) {
+        String keyA = "user:interests:" + me;
+        String keyB = "user:interests:" + other;
+        Set<String> tags = redisTemplate.opsForSet().difference(keyB, keyA); // keyA가 keyB를 대상으로 없는 것을 확인하고 싶을 때(1번 인수: keyB)
+        System.out.println(tags);
+        return tags;
+    }
 }

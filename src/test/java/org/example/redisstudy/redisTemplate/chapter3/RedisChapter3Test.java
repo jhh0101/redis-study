@@ -26,5 +26,19 @@ public class RedisChapter3Test {
         chapter3.isTagExists("post123", "python");
     }
 
+    @Test
+    void testEx2_1() {
+        chapter3.addUserInterests("userA", "Java", "Spring", "Redis");
+        chapter3.addUserInterests("userB", "Redis", "React", "Vue");
+    }
+    @Test
+    void testEx2_2() {
+        chapter3.getCommonInterests("userA", "userB");
+    }
+    @Test
+    void testEx3_3() {
+        chapter3.getRecommendedInterests("userA", "userB");
+    }
+
 
 }
