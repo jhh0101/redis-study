@@ -1,16 +1,85 @@
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: study-mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: study_db
+  backend:
+    build: .  # 현재 폴더의 Dockerfile 사용
+    container_name: study-backend
     ports:
-      - "63306:3306"
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+      - "18088:18088"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATA_REDIS_HOST=redis-master
+      - SPRING_DATA_REDIS_PORT=6379
+    depends_on:
+      - redis-master
+      - redis-sentinel-1
+    networks:
+      - redis-net
 
-  redis:
+  redis-master:
     image: redis:alpine
-    container_name: study-redis
+    container_name: study-redis-master
     ports:
       - "6379:6379"
+    command: redis-server --replica-announce-ip 192.168.219.1 --replica-announce-port 6379 # 백엔드는 도커에서 사용하는 IP를 모르기 때문에 외부 IP 주소를 알려줌
+    networks:
+      redis-net:
+        aliases:
+          - redis-master
+
+  redis-slave:
+    image: redis:alpine
+    container_name: study-redis-slave
+    ports:
+      - "6380:6379" # 내 컴퓨터에서는 6380 포트로 접속하면, 이 슬레이브의 6379로 연결됨!
+    command: redis-server --replicaof redis-master 6379 --replica-announce-ip 192.168.219.1 --replica-announce-port 6380 # redis-master라는 서버를 복사함
+    depends_on:
+      - redis-master # 마스터가 먼저 켜진 다음에 슬레이브가 켜지도록 순서 보장
+    networks:
+      - redis-net
+
+  # -----------------------------------------------------
+  # 3. 센티널 컨테이너 3개
+  # -----------------------------------------------------
+  redis-sentinel-1:
+    image: redis:alpine
+    container_name: study-sentinel-1
+    ports:
+      - "26379:26379" # 1번 경비원의 포트
+    # sentinel.conf 파일을 도커 안으로 넣어줌
+    volumes:
+      - ./sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    # 레디스 서버 대신, 센티널 모드로 설정 파일을 물고 실행시킴
+    command: redis-sentinel /usr/local/etc/redis/sentinel.conf
+    depends_on:
+      - redis-master
+    networks:
+      - redis-net
+
+  redis-sentinel-2:
+    image: redis:alpine
+    container_name: study-sentinel-2
+    ports:
+      - "26380:26379" # 2번 경비원의 포트 (포트번호 26380)
+    volumes:
+      - ./sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    command: redis-sentinel /usr/local/etc/redis/sentinel.conf
+    depends_on:
+      - redis-master
+    networks:
+      - redis-net
+
+  redis-sentinel-3:
+    image: redis:alpine
+    container_name: study-sentinel-3
+    ports:
+      - "26381:26379" # 3번 경비원의 포트 (포트번호 26381)
+    volumes:
+      - ./sentinel.conf:/usr/local/etc/redis/sentinel.conf
+    command: redis-sentinel /usr/local/etc/redis/sentinel.conf
+    depends_on:
+      - redis-master
+    networks:
+      - redis-net
+
+networks:
+  redis-net:
+    driver: bridge
